@@ -1,29 +1,18 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const SETTINGS_TABLE = 'discord_notification_settings'
-const DEFAULT_SETTINGS = {
-  pingSummary: true,
-  pingRelease: true,
-  maxSummaryPingBehindEpisodes: null,
-  maxReleasePingBehindEpisodes: null,
-}
-
 const elements = {
   authStatus: document.querySelector('#auth-status'),
+  loginForm: document.querySelector('#login-form'),
+  username: document.querySelector('#username'),
+  password: document.querySelector('#password'),
   loginButton: document.querySelector('#login-button'),
   logoutButton: document.querySelector('#logout-button'),
   settingsCard: document.querySelector('#settings-card'),
   settingsForm: document.querySelector('#settings-form'),
-  pingSummary: document.querySelector('#ping-summary'),
-  pingRelease: document.querySelector('#ping-release'),
-  maxSummaryThreshold: document.querySelector('#max-summary-threshold'),
-  maxReleaseThreshold: document.querySelector('#max-release-threshold'),
+  userSettingsList: document.querySelector('#user-settings-list'),
   saveButton: document.querySelector('#save-button'),
   saveStatus: document.querySelector('#save-status'),
 }
 
-let supabase
-let currentUser
+let currentUsers = []
 
 function setAuthStatus(message) {
   elements.authStatus.textContent = message
@@ -32,20 +21,6 @@ function setAuthStatus(message) {
 function setSaveStatus(message, isError = false) {
   elements.saveStatus.textContent = message
   elements.saveStatus.style.color = isError ? '#fca5a5' : '#cbd5e1'
-}
-
-function getStoredDiscordToken() {
-  return window.localStorage.getItem('discord_provider_token')
-}
-
-function storeDiscordToken(session) {
-  if (session?.provider_token) {
-    window.localStorage.setItem('discord_provider_token', session.provider_token)
-  }
-}
-
-function clearStoredDiscordToken() {
-  window.localStorage.removeItem('discord_provider_token')
 }
 
 function normalizeThresholdInput(value) {
@@ -57,125 +32,129 @@ function normalizeThresholdInput(value) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 }
 
-function setFormEnabled(enabled) {
+function setControlsEnabled(enabled) {
   for (const element of [
-    elements.pingSummary,
-    elements.pingRelease,
-    elements.maxSummaryThreshold,
-    elements.maxReleaseThreshold,
+    elements.username,
+    elements.password,
+    elements.loginButton,
+    elements.logoutButton,
     elements.saveButton,
   ]) {
     element.disabled = !enabled
   }
+
+  for (const input of elements.userSettingsList.querySelectorAll('input')) {
+    input.disabled = !enabled
+  }
 }
 
-function renderSettings(settings) {
-  elements.pingSummary.checked = settings.pingSummary
-  elements.pingRelease.checked = settings.pingRelease
-  elements.maxSummaryThreshold.value =
-    settings.maxSummaryPingBehindEpisodes ?? ''
-  elements.maxReleaseThreshold.value =
-    settings.maxReleasePingBehindEpisodes ?? ''
+function renderUsers(users) {
+  currentUsers = users
+  elements.userSettingsList.innerHTML = users
+    .map(
+      (user, index) => `
+        <section class="user-card">
+          <h3>${user.username}</h3>
+          <p class="user-meta">Discord ID: ${user.discordId}</p>
+
+          <div class="setting-block">
+            <div class="setting-header">
+              <h3>Today’s Anime</h3>
+              <label class="toggle">
+                <input data-index="${index}" data-field="pingSummary" type="checkbox" ${user.pingSummary ? 'checked' : ''} />
+                <span>Ping for morning summary</span>
+              </label>
+            </div>
+            <label class="field">
+              <span>Maximum episodes behind for summary pings</span>
+              <input
+                data-index="${index}"
+                data-field="maxSummaryPingBehindEpisodes"
+                type="number"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                placeholder="Always ping"
+                value="${user.maxSummaryPingBehindEpisodes ?? ''}"
+              />
+            </label>
+          </div>
+
+          <div class="setting-block">
+            <div class="setting-header">
+              <h3>Episode Out Now</h3>
+              <label class="toggle">
+                <input data-index="${index}" data-field="pingRelease" type="checkbox" ${user.pingRelease ? 'checked' : ''} />
+                <span>Ping for release alerts</span>
+              </label>
+            </div>
+            <label class="field">
+              <span>Maximum episodes behind for release pings</span>
+              <input
+                data-index="${index}"
+                data-field="maxReleasePingBehindEpisodes"
+                type="number"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                placeholder="Always ping"
+                value="${user.maxReleasePingBehindEpisodes ?? ''}"
+              />
+            </label>
+          </div>
+        </section>
+      `,
+    )
+    .join('')
 }
 
-async function fetchDiscordProfile(session, user) {
-  const token = session?.provider_token ?? getStoredDiscordToken()
-  if (token) {
-    const response = await fetch('https://discord.com/api/users/@me', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+function collectUsersFromForm() {
+  const users = structuredClone(currentUsers)
 
-    if (response.ok) {
-      const profile = await response.json()
-      return {
-        discordId: profile.id,
-        discordUsername: profile.global_name || profile.username,
-      }
+  for (const input of elements.userSettingsList.querySelectorAll('input')) {
+    const index = Number.parseInt(input.dataset.index, 10)
+    const field = input.dataset.field
+
+    if (input.type === 'checkbox') {
+      users[index][field] = input.checked
+    } else {
+      users[index][field] = normalizeThresholdInput(input.value)
     }
   }
 
-  const identity = user.identities?.find((entry) => entry.provider === 'discord')
-  const metadata = identity?.identity_data ?? user.user_metadata ?? {}
-
-  return {
-    discordId: metadata.provider_id ?? metadata.user_id ?? metadata.sub ?? null,
-    discordUsername:
-      metadata.full_name ??
-      metadata.custom_claims?.global_name ??
-      metadata.preferred_username ??
-      metadata.user_name ??
-      'Discord user',
-  }
+  return users
 }
 
-async function loadSettings(user) {
-  const { data, error } = await supabase
-    .from(SETTINGS_TABLE)
-    .select(
-      'ping_summary,ping_release,max_summary_ping_behind_episodes,max_release_ping_behind_episodes',
-    )
-    .eq('user_id', user.id)
-    .maybeSingle()
+async function fetchJson(path, init = {}) {
+  const response = await fetch(path, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init.headers ?? {}),
+    },
+    ...init,
+  })
+  const data = await response.json()
 
-  if (error) {
-    throw error
+  if (!response.ok) {
+    throw new Error(data.error || 'Request failed.')
   }
 
-  if (!data) {
-    return { ...DEFAULT_SETTINGS }
-  }
-
-  return {
-    pingSummary: data.ping_summary,
-    pingRelease: data.ping_release,
-    maxSummaryPingBehindEpisodes: data.max_summary_ping_behind_episodes,
-    maxReleasePingBehindEpisodes: data.max_release_ping_behind_episodes,
-  }
+  return data
 }
 
 async function saveSettings(event) {
   event.preventDefault()
 
-  if (!currentUser) {
-    return
-  }
-
   elements.saveButton.disabled = true
   setSaveStatus('Saving…')
 
   try {
-    const { data: sessionData } = await supabase.auth.getSession()
-    const profile = await fetchDiscordProfile(sessionData.session, currentUser)
-
-    if (!profile.discordId) {
-      throw new Error(
-        'Could not determine your Discord ID from the current session.',
-      )
-    }
-
-    const payload = {
-      user_id: currentUser.id,
-      discord_id: profile.discordId,
-      discord_username: profile.discordUsername,
-      ping_summary: elements.pingSummary.checked,
-      ping_release: elements.pingRelease.checked,
-      max_summary_ping_behind_episodes: normalizeThresholdInput(
-        elements.maxSummaryThreshold.value,
-      ),
-      max_release_ping_behind_episodes: normalizeThresholdInput(
-        elements.maxReleaseThreshold.value,
-      ),
-      updated_at: new Date().toISOString(),
-    }
-
-    const { error } = await supabase
-      .from(SETTINGS_TABLE)
-      .upsert(payload, { onConflict: 'user_id' })
-
-    if (error) {
-      throw error
-    }
-
+    const users = collectUsersFromForm()
+    await fetchJson('/.netlify/functions/settings', {
+      method: 'POST',
+      body: JSON.stringify({ users }),
+    })
+    currentUsers = users
     setSaveStatus('Saved.')
   } catch (error) {
     setSaveStatus(error.message || 'Failed to save settings.', true)
@@ -184,92 +163,57 @@ async function saveSettings(event) {
   }
 }
 
-async function signIn() {
+async function signIn(event) {
+  event.preventDefault()
   elements.loginButton.disabled = true
-  setAuthStatus('Redirecting to Discord…')
+  setAuthStatus('Signing in…')
 
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'discord',
-      options: {
-        redirectTo: window.location.origin,
-        scopes: 'identify',
-      },
+    await fetchJson('/.netlify/functions/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: elements.username.value,
+        password: elements.password.value,
+      }),
     })
-
-    if (error) {
-      throw error
-    }
+    elements.password.value = ''
+    await refreshSession()
   } catch (error) {
-    setAuthStatus(error.message || 'Failed to start Discord sign-in.')
+    setAuthStatus(error.message || 'Failed to sign in.')
     elements.loginButton.disabled = false
   }
 }
 
 async function signOut() {
-  await supabase.auth.signOut()
-  clearStoredDiscordToken()
-  currentUser = null
+  await fetchJson('/.netlify/functions/logout', { method: 'POST' })
   elements.settingsCard.hidden = true
   elements.logoutButton.hidden = true
-  elements.loginButton.hidden = false
+  elements.loginButton.disabled = false
   setAuthStatus('Signed out.')
 }
 
 async function refreshSession() {
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession()
+  const session = await fetchJson('/.netlify/functions/session')
 
-  if (error) {
-    throw error
-  }
-
-  currentUser = session?.user ?? null
-  storeDiscordToken(session)
-
-  if (!currentUser) {
+  if (!session.authenticated) {
     elements.settingsCard.hidden = true
     elements.logoutButton.hidden = true
-    elements.loginButton.hidden = false
     setAuthStatus('Not signed in.')
     return
   }
 
-  const profile = await fetchDiscordProfile(session, currentUser)
-  const settings = await loadSettings(currentUser)
+  const settings = await fetchJson('/.netlify/functions/settings')
 
-  elements.loginButton.hidden = true
   elements.logoutButton.hidden = false
   elements.settingsCard.hidden = false
-  setFormEnabled(true)
-  renderSettings(settings)
-  setAuthStatus(
-    `Signed in as ${profile.discordUsername}${profile.discordId ? ` (${profile.discordId})` : ''}`,
-  )
+  setControlsEnabled(true)
+  renderUsers(settings.users)
+  setAuthStatus('Signed in as admin.')
   setSaveStatus('')
 }
 
 async function init() {
-  const response = await fetch('/.netlify/functions/config')
-  const config = await response.json()
-
-  if (!response.ok) {
-    throw new Error(config.error || 'Failed to load app config.')
-  }
-
-  supabase = createClient(config.supabaseUrl, config.supabasePublishableKey)
-
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_OUT') {
-      clearStoredDiscordToken()
-    }
-
-    storeDiscordToken(session)
-  })
-
-  elements.loginButton.addEventListener('click', signIn)
+  elements.loginForm.addEventListener('submit', signIn)
   elements.logoutButton.addEventListener('click', signOut)
   elements.settingsForm.addEventListener('submit', saveSettings)
 
@@ -278,6 +222,6 @@ async function init() {
 
 init().catch((error) => {
   setAuthStatus(error.message || 'Failed to load app.')
-  setSaveStatus('Check your Netlify and Supabase configuration.', true)
-  setFormEnabled(false)
+  setSaveStatus('Check your Netlify admin env vars and Supabase setup.', true)
+  setControlsEnabled(false)
 })

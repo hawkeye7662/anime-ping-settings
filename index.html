@@ -12,26 +12,37 @@
         <p class="eyebrow">Today’s Anime</p>
         <h1>Ping Settings</h1>
         <p class="muted">
-          Sign in with Discord to control your morning summary pings and release
-          alert pings.
+          Admin-only dashboard for updating everyone’s morning summary and
+          release ping preferences.
         </p>
       </section>
 
       <section class="card">
-        <div class="row">
-          <div>
-            <h2>Account</h2>
-            <p id="auth-status" class="muted">Checking session…</p>
-          </div>
+        <h2>Admin login</h2>
+        <p id="auth-status" class="muted">Checking session…</p>
+        <form id="login-form" class="login-form">
+          <label class="field">
+            <span>Username</span>
+            <input id="username" name="username" type="text" autocomplete="username" />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+            />
+          </label>
           <div class="actions">
-            <button id="login-button" class="button primary" type="button">
-              Sign in with Discord
+            <button id="login-button" class="button primary" type="submit">
+              Sign in
             </button>
             <button id="logout-button" class="button" type="button" hidden>
               Sign out
             </button>
           </div>
-        </div>
+        </form>
       </section>
 
       <section id="settings-card" class="card" hidden>
@@ -42,49 +53,7 @@
         </p>
 
         <form id="settings-form">
-          <div class="setting-block">
-            <div class="setting-header">
-              <h3>Today’s Anime</h3>
-              <label class="toggle">
-                <input id="ping-summary" name="pingSummary" type="checkbox" />
-                <span>Ping me for the morning summary</span>
-              </label>
-            </div>
-            <label class="field">
-              <span>Maximum episodes behind for summary pings</span>
-              <input
-                id="max-summary-threshold"
-                name="maxSummaryPingBehindEpisodes"
-                type="number"
-                min="0"
-                step="1"
-                inputmode="numeric"
-                placeholder="Always ping"
-              />
-            </label>
-          </div>
-
-          <div class="setting-block">
-            <div class="setting-header">
-              <h3>Episode Out Now</h3>
-              <label class="toggle">
-                <input id="ping-release" name="pingRelease" type="checkbox" />
-                <span>Ping me for release alerts</span>
-              </label>
-            </div>
-            <label class="field">
-              <span>Maximum episodes behind for release pings</span>
-              <input
-                id="max-release-threshold"
-                name="maxReleasePingBehindEpisodes"
-                type="number"
-                min="0"
-                step="1"
-                inputmode="numeric"
-                placeholder="Always ping"
-              />
-            </label>
-          </div>
+          <div id="user-settings-list" class="user-settings-list"></div>
 
           <div class="actions">
             <button id="save-button" class="button primary" type="submit">

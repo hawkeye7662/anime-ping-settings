@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "check": "node --check app.js && node --check netlify/functions/config.mjs"
+    "check": "node --check app.js && for f in netlify/functions/*.mjs; do node --check \"$f\"; done"
   }
 }

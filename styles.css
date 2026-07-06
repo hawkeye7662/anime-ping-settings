@@ -105,6 +105,11 @@ body {
   margin-top: 16px;
 }
 
+.login-form {
+  display: grid;
+  gap: 4px;
+}
+
 .field span {
   font-weight: 600;
 }
@@ -119,10 +124,44 @@ input[type="number"] {
   font: inherit;
 }
 
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  color: inherit;
+  padding: 12px 14px;
+  font: inherit;
+}
+
 input[type="checkbox"] {
   inline-size: 18px;
   block-size: 18px;
   margin: 0;
+}
+
+.user-settings-list {
+  display: grid;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.user-card {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.user-card h3 {
+  margin-bottom: 4px;
+}
+
+.user-meta {
+  margin: 0 0 16px;
+  color: #94a3b8;
+  font-size: 0.95rem;
 }
 
 @media (max-width: 640px) {

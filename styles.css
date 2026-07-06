@@ -164,6 +164,12 @@ input[type="checkbox"] {
   font-size: 0.95rem;
 }
 
+.user-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 @media (max-width: 640px) {
   .row,
   .setting-header {

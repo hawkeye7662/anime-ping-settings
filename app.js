@@ -8,6 +8,7 @@ const elements = {
   settingsCard: document.querySelector('#settings-card'),
   settingsForm: document.querySelector('#settings-form'),
   userSettingsList: document.querySelector('#user-settings-list'),
+  addUserButton: document.querySelector('#add-user-button'),
   saveButton: document.querySelector('#save-button'),
   saveStatus: document.querySelector('#save-status'),
 }
@@ -54,8 +55,35 @@ function renderUsers(users) {
     .map(
       (user, index) => `
         <section class="user-card">
-          <h3>${user.username}</h3>
-          <p class="user-meta">Discord ID: ${user.discordId}</p>
+          <div class="user-grid">
+            <label class="field">
+              <span>MAL username</span>
+              <input
+                data-index="${index}"
+                data-field="malUsername"
+                type="text"
+                value="${user.malUsername ?? ''}"
+              />
+            </label>
+            <label class="field">
+              <span>Discord ID</span>
+              <input
+                data-index="${index}"
+                data-field="discordId"
+                type="text"
+                value="${user.discordId ?? ''}"
+              />
+            </label>
+            <label class="field">
+              <span>Display name</span>
+              <input
+                data-index="${index}"
+                data-field="displayName"
+                type="text"
+                value="${user.displayName ?? ''}"
+              />
+            </label>
+          </div>
 
           <div class="setting-block">
             <div class="setting-header">
@@ -117,12 +145,29 @@ function collectUsersFromForm() {
 
     if (input.type === 'checkbox') {
       users[index][field] = input.checked
-    } else {
+    } else if (input.type === 'number') {
       users[index][field] = normalizeThresholdInput(input.value)
+    } else {
+      users[index][field] = input.value.trim()
     }
   }
 
   return users
+}
+
+function addUser() {
+  renderUsers([
+    ...currentUsers,
+    {
+      malUsername: '',
+      discordId: '',
+      displayName: '',
+      pingSummary: true,
+      pingRelease: true,
+      maxSummaryPingBehindEpisodes: null,
+      maxReleasePingBehindEpisodes: null,
+    },
+  ])
 }
 
 async function fetchJson(path, init = {}) {
@@ -216,6 +261,7 @@ async function init() {
   elements.loginForm.addEventListener('submit', signIn)
   elements.logoutButton.addEventListener('click', signOut)
   elements.settingsForm.addEventListener('submit', saveSettings)
+  elements.addUserButton.addEventListener('click', addUser)
 
   await refreshSession()
 }

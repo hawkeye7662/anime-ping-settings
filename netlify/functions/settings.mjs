@@ -3,7 +3,6 @@ import {
   isAuthenticated,
   unauthorizedResponse,
 } from './_auth.mjs'
-import { KNOWN_USERS } from './_known-users.mjs'
 
 const SETTINGS_TABLE = 'discord_notification_settings'
 
@@ -21,9 +20,14 @@ function normalizeThreshold(value) {
 }
 
 function normalizeSettingRow(row) {
+  if (!row.malUsername || !row.discordId || !row.displayName) {
+    throw new Error('Each user needs a MAL username, Discord ID, and display name.')
+  }
+
   return {
-    username: row.username,
+    mal_username: row.malUsername,
     discord_id: row.discordId,
+    display_name: row.displayName,
     ping_summary: Boolean(row.pingSummary),
     ping_release: Boolean(row.pingRelease),
     max_summary_ping_behind_episodes: normalizeThreshold(
@@ -62,25 +66,16 @@ async function supabaseRequest(path, init = {}) {
   return response.json()
 }
 
-function mergeSettingsRows(rows) {
-  const rowsByDiscordId = new Map(rows.map((row) => [row.discord_id, row]))
-
-  return KNOWN_USERS.map((user) => {
-    const row = rowsByDiscordId.get(user.discordId)
-
-    return {
-      username: user.username,
-      discordId: user.discordId,
-      pingSummary: row?.ping_summary ?? user.defaults.pingSummary,
-      pingRelease: row?.ping_release ?? user.defaults.pingRelease,
-      maxSummaryPingBehindEpisodes:
-        row?.max_summary_ping_behind_episodes ??
-        user.defaults.maxSummaryPingBehindEpisodes,
-      maxReleasePingBehindEpisodes:
-        row?.max_release_ping_behind_episodes ??
-        user.defaults.maxReleasePingBehindEpisodes,
-    }
-  })
+function mapSettingsRows(rows) {
+  return rows.map((row) => ({
+    malUsername: row.mal_username ?? row.username,
+    discordId: row.discord_id,
+    displayName: row.display_name ?? row.mal_username ?? row.username,
+    pingSummary: row.ping_summary,
+    pingRelease: row.ping_release,
+    maxSummaryPingBehindEpisodes: row.max_summary_ping_behind_episodes,
+    maxReleasePingBehindEpisodes: row.max_release_ping_behind_episodes,
+  }))
 }
 
 export default async (request) => {
@@ -91,10 +86,10 @@ export default async (request) => {
   if (request.method === 'GET') {
     const rows =
       (await supabaseRequest(
-        `/rest/v1/${SETTINGS_TABLE}?select=discord_id,ping_summary,ping_release,max_summary_ping_behind_episodes,max_release_ping_behind_episodes`,
+        `/rest/v1/${SETTINGS_TABLE}?select=mal_username,username,discord_id,display_name,ping_summary,ping_release,max_summary_ping_behind_episodes,max_release_ping_behind_episodes&order=mal_username.asc.nullslast,username.asc.nullslast`,
       )) ?? []
 
-    return Response.json({ users: mergeSettingsRows(rows) })
+    return Response.json({ users: mapSettingsRows(rows) })
   }
 
   if (request.method === 'POST') {
@@ -111,6 +106,10 @@ export default async (request) => {
 
     try {
       const payload = body.users.map(normalizeSettingRow)
+      const existingRows =
+        (await supabaseRequest(
+          `/rest/v1/${SETTINGS_TABLE}?select=discord_id`,
+        )) ?? []
       await supabaseRequest(`/rest/v1/${SETTINGS_TABLE}`, {
         method: 'POST',
         headers: {
@@ -118,6 +117,21 @@ export default async (request) => {
         },
         body: JSON.stringify(payload),
       })
+
+      const retainedDiscordIds = new Set(payload.map((row) => row.discord_id))
+      const removedDiscordIds = existingRows
+        .map((row) => row.discord_id)
+        .filter((discordId) => !retainedDiscordIds.has(discordId))
+
+      if (removedDiscordIds.length) {
+        const clauses = removedDiscordIds
+          .map((discordId) => `discord_id.eq.${encodeURIComponent(discordId)}`)
+          .join(',')
+
+        await supabaseRequest(`/rest/v1/${SETTINGS_TABLE}?or=(${clauses})`, {
+          method: 'DELETE',
+        })
+      }
     } catch (error) {
       return Response.json(
         { error: error.message || 'Failed to save settings.' },

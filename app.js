@@ -178,10 +178,12 @@ async function fetchJson(path, init = {}) {
     },
     ...init,
   })
-  const data = await response.json()
+  const responseText = await response.text()
+  const isJson = response.headers.get('content-type')?.includes('application/json')
+  const data = responseText && isJson ? JSON.parse(responseText) : null
 
   if (!response.ok) {
-    throw new Error(data.error || 'Request failed.')
+    throw new Error(data?.error || `Request failed (${response.status}).`)
   }
 
   return data

@@ -63,7 +63,9 @@ async function supabaseRequest(path, init = {}) {
     return null
   }
 
-  return response.json()
+  const responseText = await response.text()
+  const isJson = response.headers.get('content-type')?.includes('application/json')
+  return responseText && isJson ? JSON.parse(responseText) : null
 }
 
 function mapSettingsRows(rows) {

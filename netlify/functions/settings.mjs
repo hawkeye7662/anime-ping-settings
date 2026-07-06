@@ -68,9 +68,9 @@ async function supabaseRequest(path, init = {}) {
 
 function mapSettingsRows(rows) {
   return rows.map((row) => ({
-    malUsername: row.mal_username ?? row.username,
+    malUsername: row.mal_username,
     discordId: row.discord_id,
-    displayName: row.display_name ?? row.mal_username ?? row.username,
+    displayName: row.display_name ?? row.mal_username,
     pingSummary: row.ping_summary,
     pingRelease: row.ping_release,
     maxSummaryPingBehindEpisodes: row.max_summary_ping_behind_episodes,
@@ -86,7 +86,7 @@ export default async (request) => {
   if (request.method === 'GET') {
     const rows =
       (await supabaseRequest(
-        `/rest/v1/${SETTINGS_TABLE}?select=mal_username,username,discord_id,display_name,ping_summary,ping_release,max_summary_ping_behind_episodes,max_release_ping_behind_episodes&order=mal_username.asc.nullslast,username.asc.nullslast`,
+        `/rest/v1/${SETTINGS_TABLE}?select=mal_username,discord_id,display_name,ping_summary,ping_release,max_summary_ping_behind_episodes,max_release_ping_behind_episodes&order=mal_username.asc`,
       )) ?? []
 
     return Response.json({ users: mapSettingsRows(rows) })

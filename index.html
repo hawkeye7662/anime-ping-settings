@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Anime Ping Settings</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="card hero">
+        <p class="eyebrow">Today’s Anime</p>
+        <h1>Ping Settings</h1>
+        <p class="muted">
+          Sign in with Discord to control your morning summary pings and release
+          alert pings.
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <div>
+            <h2>Account</h2>
+            <p id="auth-status" class="muted">Checking session…</p>
+          </div>
+          <div class="actions">
+            <button id="login-button" class="button primary" type="button">
+              Sign in with Discord
+            </button>
+            <button id="logout-button" class="button" type="button" hidden>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="settings-card" class="card" hidden>
+        <h2>Notification preferences</h2>
+        <p class="muted">
+          Leave a threshold blank to always allow pings for that notification
+          type.
+        </p>
+
+        <form id="settings-form">
+          <div class="setting-block">
+            <div class="setting-header">
+              <h3>Today’s Anime</h3>
+              <label class="toggle">
+                <input id="ping-summary" name="pingSummary" type="checkbox" />
+                <span>Ping me for the morning summary</span>
+              </label>
+            </div>
+            <label class="field">
+              <span>Maximum episodes behind for summary pings</span>
+              <input
+                id="max-summary-threshold"
+                name="maxSummaryPingBehindEpisodes"
+                type="number"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                placeholder="Always ping"
+              />
+            </label>
+          </div>
+
+          <div class="setting-block">
+            <div class="setting-header">
+              <h3>Episode Out Now</h3>
+              <label class="toggle">
+                <input id="ping-release" name="pingRelease" type="checkbox" />
+                <span>Ping me for release alerts</span>
+              </label>
+            </div>
+            <label class="field">
+              <span>Maximum episodes behind for release pings</span>
+              <input
+                id="max-release-threshold"
+                name="maxReleasePingBehindEpisodes"
+                type="number"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                placeholder="Always ping"
+              />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="save-button" class="button primary" type="submit">
+              Save settings
+            </button>
+          </div>
+        </form>
+
+        <p id="save-status" class="muted" role="status"></p>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
